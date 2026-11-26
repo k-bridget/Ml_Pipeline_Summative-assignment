@@ -4,6 +4,8 @@ An end-to-end machine learning application that identifies whether a webpage scr
 
 **Live App URL:** [https://phishing-recognition-app.politesea-e9169312.uaenorth.azurecontainerapps.io/](https://phishing-recognition-app.politesea-e9169312.uaenorth.azurecontainerapps.io/)
 
+**Demo-video:** https://youtu.be/XFsbczjFI18?feature=shared
+
 **Repository:** https://github.com/k-bridget/Ml_Pipeline_Summative-assignment
 
 ## Features
