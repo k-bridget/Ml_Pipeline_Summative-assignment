@@ -85,26 +85,33 @@ async def predict_endpoint(
 @app.post("/upload-retrain-data")
 async def upload_retrain_data(
     class_label: Annotated[str, Form(...)],
-    file: Annotated[UploadFile, File(...)],
+    files: Annotated[List[UploadFile], File(...)],
 ):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided for upload.")
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided for upload.")
 
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in IMAGE_EXTS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type ({ext}). Allowed extensions: {IMAGE_EXTS}",
-        )
-
+    temp_paths = []
     tmp_dir = tempfile.mkdtemp(prefix="phish_upload_")
     try:
-        dst = os.path.join(tmp_dir, os.path.basename(file.filename))
-        with open(dst, "wb") as out_f:
-            shutil.copyfileobj(file.file, out_f)
+        for up in files:
+            if not up.filename:
+                continue
+            ext = os.path.splitext(up.filename)[1].lower()
+            if ext not in IMAGE_EXTS:
+                continue
+            dst = os.path.join(tmp_dir, os.path.basename(up.filename))
+            with open(dst, "wb") as out_f:
+                shutil.copyfileobj(up.file, out_f)
+            temp_paths.append(dst)
+
+        if not temp_paths:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No valid image files ({IMAGE_EXTS}) found in upload.",
+            )
 
         log_entry = save_retrain_uploads(
-            saved_file_paths=[dst],
+            saved_file_paths=temp_paths,
             class_label=class_label,
             upload_root=UPLOAD_DIR,
         )
