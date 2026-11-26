@@ -8,6 +8,8 @@ An end-to-end machine learning application that identifies whether a webpage scr
 
 **Repository:** https://github.com/k-bridget/Ml_Pipeline_Summative-assignment
 
+**Google Drive:** https://drive.google.com/drive/folders/1G6GPPTfPnaeFwVptwyJqR-0F1NTMN1aH?usp=sharing
+
 ## Features
 
 - Upload a screenshot and receive a prediction with confidence.
