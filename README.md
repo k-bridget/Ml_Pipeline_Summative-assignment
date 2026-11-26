@@ -2,7 +2,7 @@
 
 An end-to-end machine learning application that identifies whether a webpage screenshot is **phishing** or **legitimate**. The project combines a MobileNetV2 image classifier, a FastAPI inference/retraining backend, and a Streamlit web interface.
 
-**Live App URL:** https://phishing-recognition-app.politesea-e9169312.uaenorth.azurecontainerapps.io/
+**Live App URL:** [https://phishing-recognition-app.politesea-e9169312.uaenorth.azurecontainerapps.io/](https://phishing-recognition-app.politesea-e9169312.uaenorth.azurecontainerapps.io/)
 
 **Repository:** https://github.com/k-bridget/Ml_Pipeline_Summative-assignment
 
