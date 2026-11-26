@@ -100,9 +100,9 @@ with tab_viz:
     st.markdown("### Key Interpretations")
     st.markdown(
         """
-        1. **Webpage Aspect Ratio (`width / height`):** Phishing screenshots skew toward higher aspect ratios than legitimate (`other`) screenshots. Many phishing pages capture compact, single-viewport credential-harvesting screens rather than tall, multi-section or scrolled pages.
-        2. **Page Brightness (`mean normalized pixel intensity`):** Phishing screenshots tend to have higher average brightness, reflecting stark, high-luminance white/light backgrounds designed to keep attention focused on a login box or impersonated brand mark.
-        3. **UI Edge Density vs. Blue Channel Dominance:** Phishing screenshots generally show lower edge density (simpler, sparser UI layouts such as single-form login pages) than denser legitimate sites, while blue channel dominance (`B - R` mean) captures blue-accented visual themes common across impersonated brands and login templates.
+1. **Webpage Aspect Ratio (`width / height`):** Phishing screenshots skew toward higher aspect ratios than legitimate (`other`) screenshots. Many phishing pages capture compact, single-viewport credential-harvesting screens rather than tall, multi-section or scrolled pages.
+2. **Page Brightness (`mean normalized pixel intensity`):** Phishing screenshots tend to have higher average brightness, reflecting stark, high-luminance white/light backgrounds designed to keep attention focused on a login box or impersonated brand mark.
+3. **UI Edge Density vs. Blue Channel Dominance:** Phishing screenshots generally show lower edge density (simpler, sparser UI layouts such as single-form login pages) than denser legitimate sites, while blue channel dominance (`B - R` mean) captures blue-accented visual themes common across impersonated brands and login templates.
         """
     )
 
@@ -144,18 +144,24 @@ with tab_retrain:
                 st.error(f"Upload request error: {exc}")
 
     st.divider()
-    col_e, col_lr = st.columns(2)
+    col_e, col_lr, col_ft = st.columns(3)
     with col_e:
         retrain_epochs = st.number_input("Retraining Epochs", min_value=1, max_value=20, value=3)
     with col_lr:
         retrain_lr = st.number_input("Learning Rate", min_value=1e-6, max_value=1e-2, value=5e-5, format="%.6f")
+    with col_ft:
+        fine_tune_layers = st.number_input("Fine-Tune Layers", min_value=0, max_value=100, value=20)
 
     if st.button("2. Trigger Retraining", type="primary"):
         with st.spinner("Preprocessing uploaded data, retraining model, and reloading weights..."):
             try:
                 r = requests.post(
                     f"{base_url}/retrain",
-                    params={"epochs": int(retrain_epochs), "learning_rate": float(retrain_lr)},
+                    params={
+                        "epochs": int(retrain_epochs),
+                        "learning_rate": float(retrain_lr),
+                        "fine_tune_layers": int(fine_tune_layers),
+                    },
                     timeout=300,
                 )
                 if r.ok:
@@ -178,11 +184,12 @@ with tab_retrain:
         if database_response.ok:
             database_status = database_response.json()
             col_batches, col_files = st.columns(2)
-            col_batches.metric("Upload Batches", database_status["batch_count"])
-            col_files.metric("Saved Upload Files", database_status["file_count"])
-            st.json(database_status["upload_counts_by_class"])
-            if database_status["recent_runs"]:
-                st.dataframe(database_status["recent_runs"], use_container_width=True)
+            col_batches.metric("Upload Batches", database_status.get("batch_count", 0))
+            col_files.metric("Saved Upload Files", database_status.get("file_count", 0))
+            st.json(database_status.get("upload_counts_by_class", {}))
+            recent_runs = database_status.get("recent_runs", [])
+            if recent_runs:
+                st.dataframe(recent_runs, use_container_width=True)
             else:
                 st.caption("No retraining runs recorded yet.")
         else:
