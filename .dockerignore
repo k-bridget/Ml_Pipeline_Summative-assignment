@@ -1,0 +1,14 @@
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+results/
+results_*.csv
+locust.py
+README.md
+.DS_Store
+
