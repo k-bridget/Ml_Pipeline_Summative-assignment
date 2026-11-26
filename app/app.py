@@ -165,3 +165,29 @@ with tab_retrain:
                     st.error(f"Retraining failed ({r.status_code}): {r.text}")
             except Exception as exc:
                 st.error(f"Retraining request error: {exc}")
+
+    st.divider()
+    st.subheader("Retraining Database")
+    if st.button("Refresh Database Status"):
+        pass
+    try:
+        database_response = requests.get(
+            f"{base_url}/database/status",
+            timeout=5,
+        )
+        if database_response.ok:
+            database_status = database_response.json()
+            col_batches, col_files = st.columns(2)
+            col_batches.metric("Upload Batches", database_status["batch_count"])
+            col_files.metric("Saved Upload Files", database_status["file_count"])
+            st.json(database_status["upload_counts_by_class"])
+            if database_status["recent_runs"]:
+                st.dataframe(database_status["recent_runs"], use_container_width=True)
+            else:
+                st.caption("No retraining runs recorded yet.")
+        else:
+            st.warning(
+                f"Could not read database status ({database_response.status_code})"
+            )
+    except Exception as exc:
+        st.error(f"Database status request failed: {exc}")

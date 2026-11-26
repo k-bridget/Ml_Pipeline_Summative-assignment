@@ -8,6 +8,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers, regularizers
 from tensorflow.keras.applications import MobileNetV2
 
+from src.database import get_database_path, record_retraining_run, record_retrain_upload
 from src.preprocessing import BATCH_SIZE, IMG_SIZE, build_retrain_dataset
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -143,6 +144,14 @@ def save_retrain_uploads(
     with open(log_path, "a", encoding="utf-8") as lf:
         lf.write(json.dumps(log_entry) + "\n")
 
+    database_entry = record_retrain_upload(
+        stored_files=stored_files,
+        class_label=folder_label,
+        numeric_label=numeric_label,
+        database_path=get_database_path(upload_root),
+    )
+    log_entry["batch_id"] = database_entry["batch_id"]
+    log_entry["database_timestamp"] = database_entry["timestamp"]
     return log_entry
 
 
@@ -156,39 +165,63 @@ def retrain_model(
     backup_dir: str = DEFAULT_BACKUP_DIR,
 ) -> dict:
     """Preprocesses uploaded retraining data."""
-    train_ds, sample_count = build_retrain_dataset(upload_dir, batch_size=batch_size)
+    database_path = get_database_path(upload_dir)
+    try:
+        train_ds, sample_count = build_retrain_dataset(upload_dir, batch_size=batch_size)
 
-    model = load_trained_model(model_path=model_path, learning_rate=learning_rate)
-    if fine_tune_layers > 0:
-        _set_fine_tune_layers(model, fine_tune_layers=fine_tune_layers)
-        model = _compile_model(model, learning_rate=learning_rate)
+        model = load_trained_model(model_path=model_path, learning_rate=learning_rate)
+        if fine_tune_layers > 0:
+            _set_fine_tune_layers(model, fine_tune_layers=fine_tune_layers)
+            model = _compile_model(model, learning_rate=learning_rate)
 
-    backup_path: Optional[str] = None
-    if os.path.exists(model_path):
-        os.makedirs(backup_dir, exist_ok=True)
-        stamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        backup_path = os.path.join(backup_dir, f"phishiris_model_{stamp}.keras")
-        shutil.copy2(model_path, backup_path)
+        backup_path: Optional[str] = None
+        if os.path.exists(model_path):
+            os.makedirs(backup_dir, exist_ok=True)
+            stamp = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"phishiris_model_{stamp}.keras")
+            shutil.copy2(model_path, backup_path)
 
-    history = model.fit(train_ds, epochs=epochs, verbose=1)
+        history = model.fit(train_ds, epochs=epochs, verbose=1)
 
-    os.makedirs(os.path.dirname(os.path.abspath(model_path)), exist_ok=True)
-    model.save(model_path)
+        os.makedirs(os.path.dirname(os.path.abspath(model_path)), exist_ok=True)
+        model.save(model_path)
 
-    last_metrics = {
-        key: float(vals[-1]) for key, vals in history.history.items() if len(vals) > 0
-    }
+        last_metrics = {
+            key: float(vals[-1]) for key, vals in history.history.items() if len(vals) > 0
+        }
 
-    return {
-        "status": "retrained",
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-        "upload_dir": upload_dir,
-        "unique_samples_used": int(sample_count),
-        "epochs": int(epochs),
-        "model_path": model_path,
-        "backup_path": backup_path,
-        "metrics": last_metrics,
-    }
+        summary = {
+            "status": "retrained",
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "upload_dir": upload_dir,
+            "unique_samples_used": int(sample_count),
+            "epochs": int(epochs),
+            "model_path": model_path,
+            "backup_path": backup_path,
+            "metrics": last_metrics,
+        }
+        record_retraining_run(
+            database_path,
+            status="retrained",
+            epochs=epochs,
+            learning_rate=learning_rate,
+            fine_tune_layers=fine_tune_layers,
+            unique_samples_used=sample_count,
+            model_path=model_path,
+            backup_path=backup_path,
+            metrics=last_metrics,
+        )
+        return summary
+    except Exception as exc:
+        record_retraining_run(
+            database_path,
+            status="failed",
+            epochs=epochs,
+            learning_rate=learning_rate,
+            fine_tune_layers=fine_tune_layers,
+            error_message=str(exc),
+        )
+        raise
 
 
 if __name__ == "__main__":

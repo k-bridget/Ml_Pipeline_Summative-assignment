@@ -2,7 +2,7 @@ import os
 import shutil
 import tempfile
 import time
-from typing import List
+from typing import Annotated, List
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +13,7 @@ from src.model import (
     retrain_model,
     save_retrain_uploads,
 )
+from src.database import get_database_status, get_database_path
 from src.prediction import PhishingPredictor
 from src.preprocessing import IMAGE_EXTS
 
@@ -48,6 +49,11 @@ def health():
     }
 
 
+@app.get("/database/status")
+def database_status():
+    return get_database_status(get_database_path(UPLOAD_DIR))
+
+
 @app.post("/predict")
 async def predict_endpoint(
     file: UploadFile = File(...),
@@ -78,34 +84,27 @@ async def predict_endpoint(
 
 @app.post("/upload-retrain-data")
 async def upload_retrain_data(
-    class_label: str = Form(...),
-    files: List[UploadFile] = File(...),
+    class_label: Annotated[str, Form(...)],
+    file: Annotated[UploadFile, File(...)],
 ):
-    if not files:
-        raise HTTPException(status_code=400, detail="No files provided for upload.")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided for upload.")
 
-    temp_paths = []
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in IMAGE_EXTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type ({ext}). Allowed extensions: {IMAGE_EXTS}",
+        )
+
     tmp_dir = tempfile.mkdtemp(prefix="phish_upload_")
     try:
-        for up in files:
-            if not up.filename:
-                continue
-            ext = os.path.splitext(up.filename)[1].lower()
-            if ext not in IMAGE_EXTS:
-                continue
-            dst = os.path.join(tmp_dir, os.path.basename(up.filename))
-            with open(dst, "wb") as out_f:
-                shutil.copyfileobj(up.file, out_f)
-            temp_paths.append(dst)
-
-        if not temp_paths:
-            raise HTTPException(
-                status_code=400,
-                detail=f"No valid image files ({IMAGE_EXTS}) found in upload.",
-            )
+        dst = os.path.join(tmp_dir, os.path.basename(file.filename))
+        with open(dst, "wb") as out_f:
+            shutil.copyfileobj(file.file, out_f)
 
         log_entry = save_retrain_uploads(
-            saved_file_paths=temp_paths,
+            saved_file_paths=[dst],
             class_label=class_label,
             upload_root=UPLOAD_DIR,
         )
@@ -115,6 +114,7 @@ async def upload_retrain_data(
             "class_label": log_entry["class_label"],
             "upload_dir": UPLOAD_DIR,
             "timestamp": log_entry["timestamp"],
+            "batch_id": log_entry.get("batch_id"),
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
