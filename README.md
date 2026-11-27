@@ -88,6 +88,12 @@ Preprocessing and data-quality checks include:
 
 ## Running Locally
 
+## Setup
+
+git colne https://github.com/k-bridget/Ml_Pipeline_Summative-assignment.git
+
+cd Ml_Pipeline_Summative-assignment
+
 ### Prerequisites
 
 - Python 3.11
